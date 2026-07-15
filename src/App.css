@@ -1,0 +1,238 @@
+:root {
+  --bg: #f6f6f6;
+  --surface: #ffffff;
+  --text: #0f0f0f;
+  --text-muted: #6b6b6b;
+  --border: #d9d9d9;
+  --accent: #396cd8;
+  --accent-text: #ffffff;
+  --status-connected: #2fb344;
+  --status-connecting: #d8a736;
+  --status-error: #d83636;
+  --status-idle: #9a9a9a;
+}
+
+:root[data-theme="dark"] {
+  --bg: #1e1e1e;
+  --surface: #2a2a2a;
+  --text: #f2f2f2;
+  --text-muted: #a3a3a3;
+  --border: #3f3f3f;
+  --accent: #5b8cff;
+  --accent-text: #0f0f0f;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1e1e1e;
+    --surface: #2a2a2a;
+    --text: #f2f2f2;
+    --text-muted: #a3a3a3;
+    --border: #3f3f3f;
+    --accent: #5b8cff;
+    --accent-text: #0f0f0f;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
+  color: var(--text);
+  background-color: var(--bg);
+}
+
+.app-shell {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.icon-button {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.4em 0.7em;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.field-label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.field-control {
+  padding: 0.6em 0.8em;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background-color: var(--surface);
+  color: var(--text);
+  font-size: 1em;
+}
+
+.language-pair {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.language-pair .field-control {
+  flex: 1;
+}
+
+.swap-button {
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background-color: var(--surface);
+  color: var(--text);
+  padding: 0.5em 0.6em;
+  cursor: pointer;
+}
+
+.swap-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.status-dot {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background-color: var(--status-idle);
+}
+
+.status-connected .status-dot {
+  background-color: var(--status-connected);
+}
+
+.status-connecting .status-dot,
+.status-reconnecting .status-dot {
+  background-color: var(--status-connecting);
+}
+
+.status-error .status-dot {
+  background-color: var(--status-error);
+}
+
+.status-error {
+  color: var(--status-error);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.transcript-panel {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background-color: var(--surface);
+  min-height: 8rem;
+  max-height: 14rem;
+  overflow-y: auto;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.transcript-empty {
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.transcript-line {
+  margin: 0;
+}
+
+.transcript-source {
+  color: var(--text-muted);
+}
+
+.transcript-translated {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.session-controls {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.primary-button,
+.secondary-button {
+  flex: 1;
+  padding: 0.65em 1em;
+  border-radius: 8px;
+  font-size: 1em;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--border);
+}
+
+.primary-button {
+  background-color: var(--accent);
+  color: var(--accent-text);
+  border-color: var(--accent);
+}
+
+.secondary-button {
+  background-color: var(--surface);
+  color: var(--text);
+}
+
+.primary-button:disabled,
+.secondary-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal {
+  background-color: var(--surface);
+  border-radius: 12px;
+  padding: 1.5rem;
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.modal h2 {
+  margin: 0;
+}
