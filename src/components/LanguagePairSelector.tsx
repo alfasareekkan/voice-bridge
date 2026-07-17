@@ -1,4 +1,5 @@
 import { SUPPORTED_LANGUAGES, type LanguageCode } from "../translation/language";
+import { SwapIcon } from "./icons";
 
 interface LanguagePairSelectorProps {
   sourceLanguage: LanguageCode;
@@ -14,8 +15,8 @@ export function LanguagePairSelector({
   disabled,
 }: LanguagePairSelectorProps) {
   return (
-    <div className="field">
-      <span className="field-label">Translation</span>
+    <section>
+      <p className="section-label">Translation</p>
       <div className="language-pair">
         <select className="field-control" value={sourceLanguage} disabled>
           {SUPPORTED_LANGUAGES.map((l) => (
@@ -32,7 +33,7 @@ export function LanguagePairSelector({
           aria-label="Swap languages"
           title="Swap languages"
         >
-          &#8595;&#8593;
+          <SwapIcon size={14} />
         </button>
         <select className="field-control" value={targetLanguage} disabled>
           {SUPPORTED_LANGUAGES.map((l) => (
@@ -42,6 +43,6 @@ export function LanguagePairSelector({
           ))}
         </select>
       </div>
-    </div>
+    </section>
   );
 }

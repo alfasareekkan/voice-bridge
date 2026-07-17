@@ -1,17 +1,22 @@
+import type { ReactNode } from "react";
 import type { AudioDeviceInfo } from "../realtime/websocket";
 
 interface DeviceSelectorProps {
   label: string;
+  icon?: ReactNode;
   devices: AudioDeviceInfo[];
   selectedId: string | null;
   onChange: (id: string) => void;
   disabled?: boolean;
 }
 
-export function DeviceSelector({ label, devices, selectedId, onChange, disabled }: DeviceSelectorProps) {
+export function DeviceSelector({ label, icon, devices, selectedId, onChange, disabled }: DeviceSelectorProps) {
   return (
     <label className="field">
-      <span className="field-label">{label}</span>
+      <span className="field-label">
+        {icon}
+        {label}
+      </span>
       <select
         className="field-control"
         value={selectedId ?? ""}

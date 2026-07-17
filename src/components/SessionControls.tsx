@@ -1,4 +1,5 @@
 import type { ConnectionStatus } from "../realtime/websocket";
+import { PlayIcon, StopIcon } from "./icons";
 
 interface SessionControlsProps {
   status: ConnectionStatus;
@@ -11,12 +12,17 @@ export function SessionControls({ status, onStart, onStop }: SessionControlsProp
 
   return (
     <div className="session-controls">
-      <button type="button" className="primary-button" onClick={onStart} disabled={isActive}>
-        Start
-      </button>
-      <button type="button" className="secondary-button" onClick={onStop} disabled={!isActive}>
-        Stop
-      </button>
+      {isActive ? (
+        <button type="button" className="record-button is-active" onClick={onStop}>
+          <StopIcon size={16} />
+          Stop session
+        </button>
+      ) : (
+        <button type="button" className="record-button" onClick={onStart}>
+          <PlayIcon size={18} />
+          Start session
+        </button>
+      )}
     </div>
   );
 }

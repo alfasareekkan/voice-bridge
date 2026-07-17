@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useSettings } from "../hooks/useSettings";
+import { MoonIcon, SunIcon } from "../components/icons";
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -37,20 +38,30 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
           />
         </label>
         <button type="button" className="secondary-button" onClick={handleSaveKey} disabled={saving || !keyInput}>
-          Save Key
+          Save key
         </button>
 
-        <label className="field">
+        <div className="field">
           <span className="field-label">Theme</span>
-          <select
-            className="field-control"
-            value={theme}
-            onChange={(e) => setTheme(e.target.value as "light" | "dark")}
-          >
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
-          </select>
-        </label>
+          <div className="theme-toggle">
+            <button
+              type="button"
+              className={theme === "light" ? "is-selected" : ""}
+              onClick={() => setTheme("light")}
+            >
+              <SunIcon />
+              Light
+            </button>
+            <button
+              type="button"
+              className={theme === "dark" ? "is-selected" : ""}
+              onClick={() => setTheme("dark")}
+            >
+              <MoonIcon />
+              Dark
+            </button>
+          </div>
+        </div>
 
         <button type="button" className="primary-button" onClick={onClose}>
           Close

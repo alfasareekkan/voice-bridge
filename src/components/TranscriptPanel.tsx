@@ -14,7 +14,7 @@ export function TranscriptPanel({ entries }: TranscriptPanelProps) {
 
   return (
     <div className="field">
-      <span className="field-label">Transcript</span>
+      <span className="section-label">Transcript</span>
       <div className="transcript-panel" ref={scrollRef}>
         {entries.length === 0 && <p className="transcript-empty">No speech yet.</p>}
         {entries.map((entry) => (
