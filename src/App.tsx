@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { MainPage } from "./pages/MainPage";
+import { AppShell } from "./components/AppShell";
 import { useTauriEvents } from "./hooks/useTauriEvents";
 import { useAppStore } from "./store/useAppStore";
 import "./App.css";
@@ -17,7 +17,7 @@ function App() {
     document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
 
-  return <MainPage />;
+  return <AppShell />;
 }
 
 export default App;

@@ -2,11 +2,7 @@ import { useState } from "react";
 import { useSettings } from "../hooks/useSettings";
 import { MoonIcon, SunIcon } from "../components/icons";
 
-interface SettingsModalProps {
-  onClose: () => void;
-}
-
-export function SettingsModal({ onClose }: SettingsModalProps) {
+export function SettingsPage() {
   const { theme, hasApiKey, setApiKey, setTheme } = useSettings();
   const [keyInput, setKeyInput] = useState("");
   const [saving, setSaving] = useState(false);
@@ -23,12 +19,13 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
   }
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h2>Settings</h2>
+    <div className="settings-page">
+      <h2>Settings</h2>
 
+      <section className="settings-section">
+        <p className="section-label">OpenAI API key</p>
         <label className="field">
-          <span className="field-label">OpenAI API Key</span>
+          <span className="field-label">API key</span>
           <input
             className="field-control"
             type="password"
@@ -40,7 +37,10 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
         <button type="button" className="secondary-button" onClick={handleSaveKey} disabled={saving || !keyInput}>
           Save key
         </button>
+      </section>
 
+      <section className="settings-section">
+        <p className="section-label">Appearance</p>
         <div className="field">
           <span className="field-label">Theme</span>
           <div className="theme-toggle">
@@ -62,11 +62,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
             </button>
           </div>
         </div>
-
-        <button type="button" className="primary-button" onClick={onClose}>
-          Close
-        </button>
-      </div>
+      </section>
     </div>
   );
 }
