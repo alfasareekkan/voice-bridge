@@ -94,3 +94,44 @@ export function MoonIcon({ size = 15 }: IconProps) {
     </svg>
   );
 }
+
+export function SearchIcon({ size = 16 }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="M21 21l-4.3-4.3" />
+    </svg>
+  );
+}
+
+export function DashboardIcon({ size = 18 }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      <rect x="3" y="3" width="8" height="8" rx="1.5" />
+      <rect x="13" y="3" width="8" height="5" rx="1.5" />
+      <rect x="13" y="11" width="8" height="10" rx="1.5" />
+      <rect x="3" y="14" width="8" height="7" rx="1.5" />
+    </svg>
+  );
+}
+
+export function RecordingsIcon({ size = 18 }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      <path d="M4 6h16" />
+      <path d="M4 12h16" />
+      <path d="M4 18h10" />
+    </svg>
+  );
+}
+
+export function MeetingsIcon({ size = 18 }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      <circle cx="9" cy="8" r="3" />
+      <path d="M3 20a6 6 0 0 1 12 0" />
+      <path d="M16 4.5a3 3 0 0 1 0 6" />
+      <path d="M17 14a6 6 0 0 1 4 5.5" />
+    </svg>
+  );
+}
