@@ -19,6 +19,7 @@ through a virtual microphone with minimal latency.
 ### Supported
 
 -   Windows
+-   macOS
 -   English ↔ Malayalam
 -   Google Meet
 -   OpenAI Realtime API
@@ -256,7 +257,6 @@ Desktop App
 -   Zoom Plugin
 -   Microsoft Teams Plugin
 -   Slack Integration
--   macOS Support
 -   Linux Support
 
 ------------------------------------------------------------------------

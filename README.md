@@ -27,6 +27,14 @@ native Windows machine.
    [VB-CABLE](https://vb-audio.com/Cable/), so Google Meet can pick a virtual
    mic as its input device.
 
+## Prerequisites (macOS)
+
+1. **Rust** — install via [rustup](https://www.rust-lang.org/tools/install).
+2. **Xcode Command Line Tools** — `xcode-select --install`.
+3. **Node.js** (v18+) and npm.
+4. **An OpenAI API key** with access to the Realtime API.
+5. *(Later, for the virtual-mic phase)* a virtual audio cable such as [BlackHole](https://existential.audio/blackhole/).
+
 ## Setup
 
 ```powershell
@@ -100,7 +108,7 @@ This is a best-effort workaround for local dev convenience only. Real
 device enumeration and audio verification should still ultimately happen on
 actual Windows, the app's real target platform — see the next section.
 
-## What still needs to be verified on Windows
+## What still needs to be verified on Windows and macOS
 
 This was all written without the ability to run it, so treat first runs as
 a debugging pass, not just a demo:
