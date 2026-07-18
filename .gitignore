@@ -30,5 +30,6 @@ src-tauri/gen
 # Windows zone-identifier metadata from downloaded files
 *:Zone.Identifier
 
-# Claude Code local settings (personal, per-machine)
-.claude/settings.local.json
+# Claude Code config (personal, per-machine — agents/commands/settings)
+.claude/
+AGENTS.md
