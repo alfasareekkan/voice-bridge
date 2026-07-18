@@ -53,6 +53,53 @@ dependencies (cpal, tokio, tokio-tungstenite, etc.).
 **Use headphones while testing** — without them, the speaker output can
 feed back into the microphone.
 
+## Running inside WSL2: empty device dropdowns
+
+If you run `npm run tauri dev` inside WSL2 (as this project was scaffolded),
+the input/output microphone dropdowns will show **"No devices found"** and
+appear unusable. This is not an application bug: the Rust backend enumerates
+devices via `cpal`'s plain ALSA backend, and WSL2 exposes no real ALSA
+hardware by default, so an empty device list is the correct behavior for
+that environment.
+
+WSLg does provide a working PulseAudio bridge to the Windows host's real
+microphone/speakers (check with `pactl info` — socket at
+`/mnt/wslg/PulseServer` — and `pactl list short sources/sinks`, which shows
+`RDPSource`/`RDPSink`). ALSA just isn't routed through it by default. To fix
+this for local dev, install the ALSA→PulseAudio bridge and route ALSA's
+default device through it:
+
+```bash
+sudo apt install libasound2-plugins pulseaudio-utils alsa-utils
+```
+
+Then create `~/.asoundrc` with:
+
+```
+pcm.pulse {
+    type pulse
+}
+ctl.pulse {
+    type pulse
+}
+
+pcm.!default {
+    type pulse
+}
+ctl.!default {
+    type pulse
+}
+```
+
+`~/.asoundrc` is a personal, per-machine dev environment file — it's not
+managed by this repo and shouldn't be committed. After creating it, `cpal`
+should enumerate the bridged host mic/speaker and the dropdowns should
+populate.
+
+This is a best-effort workaround for local dev convenience only. Real
+device enumeration and audio verification should still ultimately happen on
+actual Windows, the app's real target platform — see the next section.
+
 ## What still needs to be verified on Windows
 
 This was all written without the ability to run it, so treat first runs as
