@@ -9,6 +9,10 @@ use session::SessionManager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("failed to install rustls crypto provider");
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .manage(SessionManager::default())
