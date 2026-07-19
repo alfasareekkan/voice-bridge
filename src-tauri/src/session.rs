@@ -30,14 +30,6 @@ struct StartArgs {
     target_lang: String,
 }
 
-fn language_name(code: &str) -> &str {
-    match code {
-        "en" => "English",
-        "ml" => "Malayalam",
-        other => other,
-    }
-}
-
 static TRANSCRIPT_ID_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 fn next_transcript_id() -> String {
@@ -84,19 +76,19 @@ fn handle_server_event(app: &AppHandle, playback: &PlaybackStream, value: &Value
     };
 
     match event_type {
-        websocket::server_events::RESPONSE_AUDIO_DELTA => {
+        websocket::server_events::OUTPUT_AUDIO_DELTA => {
             if let Some(bytes) = websocket::decode_audio_delta(value) {
                 playback.push_samples(&pcm16_le_bytes_to_i16(&bytes));
             }
         }
-        websocket::server_events::RESPONSE_AUDIO_TRANSCRIPT_DELTA => {
+        websocket::server_events::OUTPUT_TRANSCRIPT_DELTA => {
             if let Some(text) = websocket::extract_transcript_delta(value) {
                 emit_transcript(app, "translated", text, false);
             }
         }
-        websocket::server_events::INPUT_AUDIO_TRANSCRIPTION_COMPLETED => {
-            if let Some(text) = value.get("transcript").and_then(|t| t.as_str()) {
-                emit_transcript(app, "source", text.to_string(), true);
+        websocket::server_events::INPUT_TRANSCRIPT_DELTA => {
+            if let Some(text) = websocket::extract_transcript_delta(value) {
+                emit_transcript(app, "source", text, false);
             }
         }
         websocket::server_events::ERROR => {
@@ -119,9 +111,7 @@ async fn run_session_once(
     cancel: &CancellationToken,
 ) -> Result<(), String> {
     let mut client = RealtimeClient::connect(api_key).await?;
-    client
-        .send_session_update(language_name(&args.source_lang), language_name(&args.target_lang))
-        .await?;
+    client.send_session_update(&args.target_lang).await?;
 
     emit_status(app, "connected", None);
 

@@ -1,36 +1,66 @@
-//! OpenAI Realtime API WebSocket client.
+//! OpenAI Realtime *Translations* API WebSocket client.
 //!
-//! NOTE: the exact model id, required beta header, and PCM sample rate
-//! documented here reflect OpenAI's Realtime API as of this writing and can
-//! drift. Every literal event/field name is kept as a named constant below
-//! so a doc-drift fix only needs to change this file.
+//! Targets the dedicated GA translation endpoint (`/v1/realtime/translations`
+//! with the `gpt-realtime-translate` model), not the general-purpose
+//! conversational Realtime endpoint. This endpoint acts as a direct speech
+//! interpreter natively, so unlike the old beta approach there is no
+//! system-prompt hack telling a conversational model to behave like a
+//! translator.
+//!
+//! NOTE: the exact model id, headers, event names, and session-config shape
+//! documented here reflect OpenAI's docs as of this writing and were not all
+//! confirmed against a live connection — verify against
+//! https://developers.openai.com/api/docs/guides/realtime-translation and
+//! the "Translation client/server events" reference pages if anything here
+//! turns out to be wrong. Every literal event/field name is kept as a named
+//! constant below so a doc-drift fix only needs to change this file.
 
 use base64::Engine;
 use futures_util::{SinkExt, StreamExt};
 use serde_json::{json, Value};
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use tokio::net::TcpStream;
+use tokio::time::{timeout, Duration};
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::http::HeaderValue;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
 
-pub const REALTIME_URL_BASE: &str = "wss://api.openai.com/v1/realtime";
-/// Verify against https://platform.openai.com/docs/guides/realtime at
-/// implementation/deploy time — realtime model ids are revised periodically.
-pub const REALTIME_MODEL: &str = "gpt-4o-realtime-preview-2024-12-17";
-pub const OPENAI_BETA_HEADER_VALUE: &str = "realtime=v1";
+pub const REALTIME_URL_BASE: &str = "wss://api.openai.com/v1/realtime/translations";
+/// Verify against https://developers.openai.com/api/docs/guides/realtime-translation
+/// at implementation/deploy time — realtime model ids are revised periodically.
+pub const REALTIME_MODEL: &str = "gpt-realtime-translate";
+
+/// Bound on how long we wait for the server's `session.closed` ack after we
+/// send `session.close`, before force-closing the raw socket anyway.
+const GRACEFUL_CLOSE_TIMEOUT: Duration = Duration::from_secs(3);
 
 pub mod client_events {
     pub const SESSION_UPDATE: &str = "session.update";
-    pub const INPUT_AUDIO_BUFFER_APPEND: &str = "input_audio_buffer.append";
+    pub const INPUT_AUDIO_BUFFER_APPEND: &str = "session.input_audio_buffer.append";
+    pub const SESSION_CLOSE: &str = "session.close";
 }
 
 pub mod server_events {
-    pub const RESPONSE_AUDIO_DELTA: &str = "response.audio.delta";
-    pub const RESPONSE_AUDIO_TRANSCRIPT_DELTA: &str = "response.audio_transcript.delta";
-    pub const INPUT_AUDIO_TRANSCRIPTION_COMPLETED: &str =
-        "conversation.item.input_audio_transcription.completed";
+    pub const OUTPUT_AUDIO_DELTA: &str = "session.output_audio.delta";
+    pub const OUTPUT_TRANSCRIPT_DELTA: &str = "session.output_transcript.delta";
+    pub const INPUT_TRANSCRIPT_DELTA: &str = "session.input_transcript.delta";
+    pub const SESSION_CLOSED: &str = "session.closed";
     pub const ERROR: &str = "error";
+}
+
+/// Best-effort stable per-machine-user identifier for the required
+/// `OpenAI-Safety-Identifier` header (used by OpenAI for abuse monitoring,
+/// not validated against anything on our side). Not a cryptographic hash —
+/// just needs to be a reasonably stable, non-empty opaque string.
+fn safety_identifier() -> String {
+    let raw = std::env::var("USER")
+        .or_else(|_| std::env::var("USERNAME"))
+        .unwrap_or_else(|_| "voxbridge-user".to_string());
+    let mut hasher = DefaultHasher::new();
+    raw.hash(&mut hasher);
+    "vb-".to_string() + &format!("{:x}", hasher.finish())
 }
 
 type WsStream = WebSocketStream<MaybeTlsStream<TcpStream>>;
@@ -52,40 +82,33 @@ impl RealtimeClient {
             HeaderValue::from_str(&format!("Bearer {api_key}"))
                 .map_err(|e| format!("invalid API key header: {e}"))?,
         );
-        headers.insert("OpenAI-Beta", HeaderValue::from_static(OPENAI_BETA_HEADER_VALUE));
+        headers.insert(
+            "OpenAI-Safety-Identifier",
+            HeaderValue::from_str(&safety_identifier())
+                .map_err(|e| format!("invalid safety identifier header: {e}"))?,
+        );
 
         let (stream, _response) = connect_async(request)
             .await
-            .map_err(|e| format!("failed to connect to OpenAI Realtime API: {e}"))?;
+            .map_err(|e| format!("failed to connect to OpenAI Realtime Translations API: {e}"))?;
 
         Ok(Self { stream })
     }
 
-    /// Configures the session to act as a direct speech interpreter rather
-    /// than a conversational assistant. This prompt-based approach is a
-    /// known correctness risk (the underlying model can be tempted to
-    /// *answer* instead of *translate*) — flagged for real-speech testing.
-    pub async fn send_session_update(
-        &mut self,
-        source_lang_name: &str,
-        target_lang_name: &str,
-    ) -> Result<(), String> {
-        let instructions = format!(
-            "You are a real-time interpreter. You will receive spoken audio in {source_lang_name}. \
-             Immediately respond with only a spoken translation into {target_lang_name}. \
-             Do not answer questions, do not add commentary, do not have a conversation — \
-             produce solely the direct translation of what was said, preserving tone and intent."
-        );
-
+    /// Configures the translation session's target output language. The
+    /// dedicated translation model acts as a direct interpreter natively —
+    /// no system prompt is needed (unlike the old conversational-model
+    /// workaround this replaced). Source language is assumed to be
+    /// auto-detected by the model; an explicit `session.audio.input.language`
+    /// field was not confirmed in available docs. If translations turn out
+    /// wrong for a given source language, that's the first thing to check.
+    pub async fn send_session_update(&mut self, target_lang_code: &str) -> Result<(), String> {
         let payload = json!({
             "type": client_events::SESSION_UPDATE,
             "session": {
-                "modalities": ["audio", "text"],
-                "instructions": instructions,
-                "input_audio_format": "pcm16",
-                "output_audio_format": "pcm16",
-                "input_audio_transcription": { "model": "whisper-1" },
-                "turn_detection": { "type": "server_vad" }
+                "audio": {
+                    "output": { "language": target_lang_code }
+                }
             }
         });
         self.send_json(&payload).await
@@ -119,14 +142,42 @@ impl RealtimeClient {
                             .map_err(|e| format!("failed to parse server event: {e}")),
                     )
                 }
-                Some(Ok(Message::Close(_))) | None => None,
+                Some(Ok(Message::Close(frame))) => {
+                    let detail = frame
+                        .map(|f| format!("code={} reason={}", f.code, f.reason))
+                        .unwrap_or_else(|| "no close details provided by server".to_string());
+                    Some(Err(format!("server closed the connection: {detail}")))
+                }
+                None => None,
                 Some(Ok(_)) => continue, // ignore ping/pong/binary frames
                 Some(Err(e)) => Some(Err(format!("websocket read error: {e}"))),
             };
         }
     }
 
+    /// Gracefully ends the session: sends `session.close` and waits (up to
+    /// `GRACEFUL_CLOSE_TIMEOUT`) for the server's `session.closed` ack so
+    /// any already-buffered translated audio isn't dropped, per the
+    /// translations endpoint's documented close sequence, then closes the
+    /// raw socket. Never fails outward — this always runs during cleanup.
     pub async fn close(&mut self) {
+        let close_event = json!({ "type": client_events::SESSION_CLOSE });
+        if self.send_json(&close_event).await.is_ok() {
+            let _ = timeout(GRACEFUL_CLOSE_TIMEOUT, async {
+                loop {
+                    match self.next_event().await {
+                        Some(Ok(value)) => {
+                            if value.get("type").and_then(|t| t.as_str()) == Some(server_events::SESSION_CLOSED) {
+                                return;
+                            }
+                        }
+                        Some(Err(_)) | None => return,
+                    }
+                }
+            })
+            .await;
+        }
+
         let _ = self.stream.close(None).await;
     }
 }
