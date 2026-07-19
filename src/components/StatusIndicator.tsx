@@ -22,7 +22,7 @@ export function StatusIndicator({ status, errorMessage }: StatusIndicatorProps) 
         <span className="status-dot" aria-hidden="true" />
         <span>{STATUS_LABEL[status]}</span>
       </div>
-      {status === "error" && errorMessage && (
+      {(status === "error" || status === "reconnecting") && errorMessage && (
         <p className="status-error-message">
           <AlertIcon />
           <span>{errorMessage}</span>
