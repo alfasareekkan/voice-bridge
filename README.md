@@ -118,17 +118,18 @@ a debugging pass, not just a demo:
 - Sample-rate/format negotiation between your device's native format and the
   24kHz mono PCM16 OpenAI's Realtime API expects — listen for aliasing or
   glitches from the linear-interpolation resampler in `src-tauri/src/audio.rs`.
-- Whether the "translate, don't converse" system prompt in
-  `src-tauri/src/websocket.rs` reliably produces translations rather than
-  the model answering questions or chatting back — likely needs prompt
-  iteration.
+- Whether the GA Realtime Translations endpoint in
+  `src-tauri/src/websocket.rs` actually accepts the session-config shape and
+  headers this code sends — the model/endpoint/session-config details were
+  not confirmed against a live connection when written.
 - Reconnect/backoff behavior if the connection drops mid-session.
 - That `settings.json` (stored under your Windows `AppData` config dir)
   round-trips correctly across app restarts.
-- The exact OpenAI Realtime model id, beta header, and audio format in
-  `src-tauri/src/websocket.rs` — these can drift from OpenAI's docs after
-  this code was written; check https://platform.openai.com/docs/guides/realtime
-  if the connection fails immediately.
+- The exact OpenAI Realtime Translations model id, headers, and audio format
+  in `src-tauri/src/websocket.rs` — these can drift from OpenAI's docs after
+  this code was written; check
+  https://developers.openai.com/api/docs/guides/realtime-translation if the
+  connection fails immediately.
 
 ## Project structure
 

@@ -205,23 +205,34 @@ called once from `App.tsx`.
   resamples to 24kHz, converts to PCM16-LE bytes, and pushes each chunk
   through a `tokio::sync::mpsc::UnboundedSender<Vec<u8>>`. `stop()` signals
   the thread to exit and joins it.
-- **`websocket.rs`** — the OpenAI Realtime API client. **Contains the parts
-  most likely to have drifted from OpenAI's actual current API** — see the
-  file's top-of-file comment.
-  - Constants: `REALTIME_URL_BASE = "wss://api.openai.com/v1/realtime"`,
-    `REALTIME_MODEL = "gpt-4o-realtime-preview-2024-12-17"`,
-    `OPENAI_BETA_HEADER_VALUE = "realtime=v1"`.
+- **`websocket.rs`** — the OpenAI Realtime *Translations* API client (the
+  dedicated GA `/v1/realtime/translations` endpoint, not the general
+  conversational Realtime endpoint). **Contains the parts most likely to
+  have drifted from OpenAI's actual current API** — see the file's
+  top-of-file comment.
+  - Constants: `REALTIME_URL_BASE = "wss://api.openai.com/v1/realtime/translations"`,
+    `REALTIME_MODEL = "gpt-realtime-translate"`.
   - `client_events` / `server_events` modules — named string constants for
-    every event `type` field used, so a doc-drift fix is one-place.
+    every event `type` field used (GA-scoped, e.g. `session.input_audio_buffer.append`,
+    `session.output_audio.delta`, `session.close`/`session.closed`), so a
+    doc-drift fix is one-place.
+  - `safety_identifier()` — best-effort stable per-machine-user string sent
+    as the required `OpenAI-Safety-Identifier` header; not a security
+    control, just a non-empty opaque id for OpenAI's abuse monitoring.
   - `RealtimeClient` — `connect(api_key)` (sets `Authorization: Bearer` and
-    `OpenAI-Beta` headers, connects via `tokio-tungstenite`),
-    `send_session_update(source_lang_name, target_lang_name)` (builds and
-    sends the `session.update` payload — see §9 for the translation prompt),
-    `send_audio_chunk(pcm16_le_bytes)` (base64-encodes and sends
-    `input_audio_buffer.append`), `next_event()` (reads/parses the next
-    server message as `serde_json::Value`; events are parsed generically
-    rather than into strongly-typed structs, to reduce breakage risk from
-    API drift), `close()`.
+    `OpenAI-Safety-Identifier` headers, connects via `tokio-tungstenite`),
+    `send_session_update(target_lang_code)` (builds and sends the
+    `session.update` payload setting `session.audio.output.language` — see
+    §9; no system prompt needed), `send_audio_chunk(pcm16_le_bytes)`
+    (base64-encodes and sends the input-audio-buffer-append event),
+    `next_event()` (reads/parses the next server message as
+    `serde_json::Value`; an unexpected `Message::Close` now surfaces as
+    `Err` with the close code/reason instead of silently ending the stream;
+    events are parsed generically rather than into strongly-typed structs,
+    to reduce breakage risk from API drift), `close()` (sends `session.close`
+    and waits up to a 3s timeout for the server's `session.closed` ack
+    before force-closing the socket, so buffered translated audio isn't
+    dropped).
   - `decode_audio_delta(value)` / `extract_transcript_delta(value)` — pull
     the `delta` field out of a parsed server event.
 - **`session.rs`** — the orchestrator tying capture, the WebSocket client,
@@ -242,12 +253,10 @@ called once from `App.tsx`.
     the WebSocket), and server events (dispatched to `handle_server_event`).
     Cleans up mic/playback/socket on any exit path.
   - `handle_server_event(app, playback, value)` — routes a parsed server
-    event by its `type` field: audio deltas → `playback.push_samples`,
-    transcript deltas → `transcript-update` (role `"translated"`),
-    input-transcription-completed → `transcript-update` (role `"source"`),
+    event by its `type` field: output audio deltas → `playback.push_samples`,
+    output transcript deltas → `transcript-update` (role `"translated"`),
+    input transcript deltas → `transcript-update` (role `"source"`),
     errors → `session-error`.
-  - `language_name(code)` — maps `"en"`/`"ml"` to `"English"`/`"Malayalam"`
-    for the prompt text; falls through to the raw code otherwise.
   - Commands: `start_session`, `stop_session`, `get_session_status` (table
     in §5).
 - **`settings.rs`** — local persistence, hand-rolled (not `tauri-plugin-store`,
@@ -310,19 +319,22 @@ loadSettings()    // calls get_settings, hydrates theme/hasApiKey/languages
 No raw audio, PCM buffers, the API key value, or reconnect counters ever
 enter this store — those stay entirely Rust-side.
 
-## 9. The translation approach, and its known risk
+## 9. The translation approach
 
-OpenAI's Realtime API is a conversational speech-to-speech model — it has
-no dedicated "translate" mode. `websocket.rs`'s `send_session_update` works
-around this with an `instructions` system prompt telling the model to act
-as a direct interpreter and never answer/converse (full text in that
-function). **This is flagged as a real correctness risk, not just
-plumbing**: the model can be tempted to answer a question spoken in the
-source audio instead of translating it. This needs testing with real
-speech on Windows and will likely need prompt iteration. If prompt-only
-translation proves unreliable, the documented fallback (not yet built) is a
-two-stage pipeline: transcribe via `input_audio_transcription` → translate
-the text separately → TTS.
+`websocket.rs` targets OpenAI's dedicated GA Realtime *Translations*
+endpoint (`/v1/realtime/translations`, model `gpt-realtime-translate`),
+which acts as a direct speech interpreter natively. This replaced an
+earlier approach built against the general conversational Realtime
+endpoint, which had no dedicated "translate" mode and relied on an
+`instructions` system prompt telling the model to behave like an
+interpreter and never answer/converse — a real correctness risk (the model
+could be tempted to answer a question instead of translating it). With the
+translations endpoint, `send_session_update` only needs to set the target
+output language (`session.audio.output.language`); no system prompt exists.
+Source language is assumed to be auto-detected by the model — an explicit
+input-language field was not confirmed in available docs. This still needs
+verification against a live connection (see `websocket.rs`'s top-of-file
+comment and README.md's "what still needs to be verified" list).
 
 ## 10. Things very likely to need fixing once `cargo check` finally runs
 
