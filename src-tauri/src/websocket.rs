@@ -190,3 +190,82 @@ pub fn decode_audio_delta(value: &Value) -> Option<Vec<u8>> {
 pub fn extract_transcript_delta(value: &Value) -> Option<String> {
     value.get("delta").and_then(|d| d.as_str()).map(|s| s.to_string())
 }
+
+#[cfg(test)]
+impl RealtimeClient {
+    fn from_test_stream(stream: WsStream) -> Self {
+        Self { stream }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::net::TcpListener;
+    use tokio_tungstenite::accept_async;
+
+    /// Spins up a real local websocket server/client pair (no network access
+    /// needed) so wire-level payloads and the close handshake can be
+    /// exercised end-to-end instead of only unit-testing pure helpers.
+    async fn connected_pair() -> (RealtimeClient, WebSocketStream<TcpStream>) {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server_task = tokio::spawn(async move {
+            let (tcp, _) = listener.accept().await.unwrap();
+            accept_async(tcp).await.unwrap()
+        });
+        let (client_stream, _) = connect_async(format!("ws://{addr}")).await.unwrap();
+        let server_stream = server_task.await.unwrap();
+        (RealtimeClient::from_test_stream(client_stream), server_stream)
+    }
+
+    #[tokio::test]
+    async fn send_session_update_sends_ga_translation_payload() {
+        let (mut client, mut server) = connected_pair().await;
+        client.send_session_update("ml").await.unwrap();
+
+        let msg = server.next().await.unwrap().unwrap();
+        let value: Value = serde_json::from_str(msg.to_text().unwrap()).unwrap();
+        assert_eq!(value["type"], client_events::SESSION_UPDATE);
+        assert_eq!(value["session"]["audio"]["output"]["language"], "ml");
+    }
+
+    #[tokio::test]
+    async fn send_audio_chunk_uses_ga_scoped_event_type() {
+        let (mut client, mut server) = connected_pair().await;
+        client.send_audio_chunk(&[1, 2, 3, 4]).await.unwrap();
+
+        let msg = server.next().await.unwrap().unwrap();
+        let value: Value = serde_json::from_str(msg.to_text().unwrap()).unwrap();
+        assert_eq!(value["type"], "session.input_audio_buffer.append");
+    }
+
+    #[tokio::test]
+    async fn close_waits_for_session_closed_ack_before_returning() {
+        let (mut client, mut server) = connected_pair().await;
+        let server_task = tokio::spawn(async move {
+            let closed = server.next().await.unwrap().unwrap();
+            let value: Value = serde_json::from_str(closed.to_text().unwrap()).unwrap();
+            assert_eq!(value["type"], client_events::SESSION_CLOSE);
+
+            let ack = json!({ "type": server_events::SESSION_CLOSED }).to_string();
+            server.send(Message::Text(ack.into())).await.unwrap();
+        });
+
+        let start = std::time::Instant::now();
+        client.close().await;
+        assert!(start.elapsed() < GRACEFUL_CLOSE_TIMEOUT, "close() should return promptly once the ack arrives");
+        server_task.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn close_gives_up_after_timeout_if_server_never_acks() {
+        let (mut client, _server) = connected_pair().await;
+
+        let start = std::time::Instant::now();
+        client.close().await;
+        let elapsed = start.elapsed();
+        assert!(elapsed >= GRACEFUL_CLOSE_TIMEOUT, "close() should wait out the graceful timeout");
+        assert!(elapsed < GRACEFUL_CLOSE_TIMEOUT + Duration::from_secs(2), "close() should not hang well past the timeout");
+    }
+}
